@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self' data: blob:;">
+<title>きゅうり動画</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: transparent; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans JP', sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+:root {
+  --c-accent: #e5e5e5; --c-accent2: #999; --c-on-accent: #0a0a0a;
+  --c-app: #0a0a0a; --c-player: linear-gradient(135deg,#000,#111);
+  --c-panel: #0d0d0d; --c-ctrl: rgba(18,18,18,0.97);
+  --c-ctrl-border: rgba(255,255,255,0.07); --c-title: rgba(255,255,255,0.03);
+  --c-seek: rgba(255,255,255,0.10); --c-fill: linear-gradient(90deg,#e5e5e5,#888);
+  --c-text: #f0f0f0; --c-sub: #e5e5e5; --c-muted: #555;
+  --c-divider: rgba(255,255,255,0.06); --c-tag: rgba(255,255,255,0.08);
+  --c-tag-t: #999; --c-btn-hov: rgba(255,255,255,0.06);
+  --c-hl: rgba(255,255,255,0.06); --c-hl-b: #e5e5e5;
+  --c-sub-bg: rgba(0,0,0,0.72); --c-thumb: #333;
+  --c-settings: rgba(15,15,15,0.98);
+  --c-wincls: #c0392b; --c-winmin: #666; --c-winmax: #666;
+}
+
+/* App wrapper */
+#app {
+  background: var(--c-app); border-radius: 12px; overflow: hidden;
+  display: flex; flex-direction: column; flex: 1;
+  border: 1px solid var(--c-ctrl-border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  user-select: none; transition: background 0.3s;
+}
+
+/* ── Titlebar – Windows style ── */
+#titlebar {
+  display: flex; align-items: center;
+  padding: 0; height: 34px;
+  background: var(--c-title);
+  border-bottom: 1px solid var(--c-divider);
+  -webkit-app-region: drag;
+}
+/* 左側：タイトル名 + バッジ */
+.title-left {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 12px; flex: 1; min-width: 0;
+  overflow: hidden;
+}
+#title-name {
+  font-size: 12px; font-weight: 700; color: var(--c-sub);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 中央ボタン群 */
+.title-btns {
+  display: flex; gap: 2px; align-items: center; flex-shrink: 0;
+  -webkit-app-region: no-drag; padding: 0 4px;
+}
+/* 右端：Windows ウィンドウコントロール */
+.win-ctrl {
+  display: flex; align-items: stretch; height: 34px;
+  -webkit-app-region: no-drag; flex-shrink: 0;
+}
+.win-btn {
+  width: 46px; height: 34px; background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--c-muted); transition: background 0.1s, color 0.1s;
+  font-size: 14px; font-weight: 400; line-height: 1;
+}
+.win-btn:hover { background: rgba(128,128,128,0.18); color: var(--c-text); }
+#dot-close:hover { background: var(--c-wincls) !important; color: #fff !important; }
+
+/* Tag / icon buttons */
+.tag-btn {
+  background: var(--c-tag); border: none; color: var(--c-tag-t);
+  padding: 4px 12px; border-radius: 20px; cursor: pointer;
+  font-size: 11px; font-weight: 700; font-family: inherit;
+  display: flex; align-items: center; gap: 3px; transition: opacity 0.12s;
+}
+.tag-btn:hover { opacity: 0.8; }
+.ibtn {
+  background: none; border: none; cursor: pointer;
+  color: var(--c-accent); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, transform 0.08s; flex-shrink: 0;
+}
+.ibtn:hover { background: var(--c-btn-hov); transform: scale(1.08); }
+.ibtn.active { background: var(--c-hl); border: 1px solid color-mix(in srgb, var(--c-hl-b) 35%, transparent); }
+.ibtn.round { border-radius: 50%; background: var(--c-fill) !important; color: var(--c-on-accent) !important; }
+.ibtn.round:hover { transform: scale(1.1); }
+.ibtn:disabled { opacity: 0.35; cursor: default; transform: none !important; }
+
+/* Body */
+#body { display: flex; flex: 1; min-height: 0; }
+
+/* Video box */
+#videobox {
+  flex: 1; background: var(--c-player); position: relative;
+  min-height: 250px; display: flex; align-items: center; justify-content: center;
+  cursor: default; overflow: hidden;
+}
+#videobox.loaded { cursor: pointer; touch-action: none; }
+#zoom-chip {
+  display: none; position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 12;
+  padding: 5px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 700; font-family: inherit;
+  letter-spacing: 0.03em;
+}
+#zoom-chip.show { display: block; }
+video#vid { width: 100%; height: 100%; object-fit: contain; display: none; }
+video#vid.show { display: block; }
+
+.drop-overlay {
+  position: absolute; inset: 0; z-index: 30;
+  background: rgba(255,255,255,0.12); backdrop-filter: blur(4px);
+  border: 2px dashed var(--c-hl-b);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.drop-overlay span { color: #fff; font-size: 16px; font-weight: 700; }
+
+#empty-state { text-align: center; }
+#empty-state .icon { font-size: 44px; margin-bottom: 10px; opacity: 0.8; }
+#empty-state .label { color: rgba(255,255,255,0.8); font-size: 14px; font-weight: 700; }
+#empty-state .or { color: rgba(255,255,255,0.4); font-size: 12px; margin: 6px 0; }
+#empty-state .open-btn {
+  background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.35);
+  color: #fff; padding: 7px 22px; border-radius: 20px; cursor: pointer;
+  font-size: 12px; font-weight: 700; font-family: inherit;
+}
+
+#pause-icon {
+  position: absolute; width: 60px; height: 60px; border-radius: 50%;
+  background: rgba(255,255,255,0.12); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.18);
+  display: none; align-items: center; justify-content: center; z-index: 3;
+}
+
+/* 再生終了後のリプレイ表示（YouTube 風） */
+#replay-overlay {
+  position: absolute; inset: 0; z-index: 4;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.45); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#replay-overlay.show { display: flex; }
+#replay-overlay .replay-circle {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: rgba(255,255,255,0.16); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.3);
+  display: flex; align-items: center; justify-content: center;
+}
+#replay-overlay:active .replay-circle { background: rgba(255,255,255,0.28); }
+#replay-overlay .replay-label {
+  position: absolute; left: 0; right: 0; bottom: 14%; text-align: center;
+  color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+}
+
+/* Subtitle overlay — 背景は JS で動的に制御 */
+.sub-overlay {
+  position: absolute; z-index: 5;
+  color: #fff;
+  font-weight: 700; max-width: 90%;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5);
+  pointer-events: none;
+  transition: background-color 0.2s, padding 0.2s, border-radius 0.2s;
+}
+
+/* Badges */
+.badge {
+  position: absolute; background: rgba(0,0,0,0.45); backdrop-filter: blur(8px);
+  font-size: 10px; padding: 3px 10px; border-radius: 10px;
+  font-weight: 700; color: rgba(255,255,255,0.75);
+}
+#badge-sub   { top: 10px; left: 12px; }
+#badge-audio { top: 10px; right: 12px; color: rgba(255,255,255,0.6); font-weight: 400; }
+#badge-speed { top: 10px; left: 50%; transform: translateX(-50%); color: rgba(255,220,100,0.9); }
+
+/* Controls */
+#controls {
+  background: var(--c-ctrl); backdrop-filter: blur(24px);
+  border-top: 1px solid var(--c-ctrl-border);
+  padding: 10px 14px 13px;
+}
+
+/* Seekbar */
+#seekbar-wrap {
+  position: relative; height: 20px; display: flex; align-items: center;
+  cursor: pointer; margin-bottom: 8px;
+}
+#seekbar-track {
+  position: relative; width: 100%; height: 5px;
+  background: var(--c-seek); border-radius: 3px;
+}
+#seekbar-fill {
+  position: absolute; left: 0; top: 0; height: 100%;
+  background: var(--c-fill); border-radius: 3px; width: 0%;
+  pointer-events: none;
+}
+#seekbar-thumb {
+  position: absolute; top: 50%; transform: translate(-50%,-50%);
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--c-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-accent) 22%, transparent);
+  left: 0%; pointer-events: none;
+}
+#seek-tooltip {
+  position: absolute; bottom: 20px;
+  background: #2a2a2a; color: #fff;
+  font-size: 10px; padding: 2px 7px; border-radius: 4px;
+  white-space: nowrap; pointer-events: none; display: none;
+}
+
+/* Button row */
+#btn-row { display: flex; align-items: center; gap: 3px; }
+#time-display { margin-left: 8px; font-size: 12px; color: var(--c-muted); font-weight: 700; min-width: 98px; white-space: nowrap; }
+.spacer { flex: 1; }
+
+/* Dropdown menus */
+.pop-wrap { position: relative; }
+.pop-menu {
+  position: absolute; bottom: 130%; right: 0; z-index: 200;
+  background: #1a1a1a; border: 1px solid var(--c-ctrl-border);
+  border-radius: 14px; padding: 6px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.18);
+  min-width: 150px; display: none;
+}
+.pop-menu.open { display: block; }
+.pop-item {
+  padding: 6px 14px; border-radius: 8px; cursor: pointer;
+  font-size: 12px; color: var(--c-text); font-weight: 500; white-space: nowrap;
+}
+.pop-item:hover { background: var(--c-btn-hov); }
+.pop-item.selected { color: var(--c-accent); font-weight: 700; background: var(--c-hl); }
+
+/* Timeline panel */
+#timeline {
+  width: 265px; flex-shrink: 0;
+  background: var(--c-panel); border-left: 1px solid var(--c-divider);
+  display: flex; flex-direction: column;
+}
+#tl-header {
+  padding: 10px 14px; border-bottom: 1px solid var(--c-divider);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--c-title);
+}
+#tl-title { font-size: 12px; font-weight: 800; color: var(--c-sub); }
+#tl-tabs { display: flex; gap: 2px; min-width: 0; }
+.tl-tab { padding: 5px 9px; border: 0; border-radius: 8px; background: none; color: var(--c-muted); font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer; white-space: nowrap; }
+.tl-tab.active { background: var(--c-hl); color: var(--c-accent); }
+.tl-tab-n { margin-left: 4px; font-size: 10px; opacity: 0.8; }
+.tl-pane { display: none; flex: 1; overflow-y: auto; padding: 6px 0 10px; scrollbar-width: thin; scrollbar-color: var(--c-thumb) transparent; }
+#timeline[data-tab="ts"] #tl-ts, #timeline[data-tab="ab"] #tl-ab { display: block; }
+#timeline[data-tab="ts"] #tl-list, #timeline[data-tab="ab"] #tl-list,
+#timeline[data-tab="ts"] #tl-footer, #timeline[data-tab="ab"] #tl-footer { display: none; }
+#tl-list { flex: 1; overflow-y: auto; padding: 4px 0; scrollbar-width: thin; scrollbar-color: var(--c-thumb) transparent; }
+.tl-row { padding: 8px 14px; cursor: pointer; border-left: 3px solid transparent; transition: background 0.12s; }
+.tl-row:hover { background: var(--c-btn-hov); }
+.tl-row.active { border-left-color: var(--c-hl-b); background: var(--c-hl); }
+.tl-times { display: flex; gap: 6px; margin-bottom: 3px; align-items: center; }
+.tl-start { font-size: 10px; color: var(--c-muted); font-weight: 700; min-width: 36px; }
+.tl-row.active .tl-start { color: var(--c-accent); }
+.tl-sep { font-size: 9px; color: var(--c-muted); }
+.tl-end { font-size: 10px; color: var(--c-muted); }
+.tl-dot { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--c-accent); flex-shrink: 0; animation: pulse 1.2s infinite; }
+.tl-text { font-size: 12px; line-height: 1.45; color: var(--c-text); font-weight: 500; }
+.tl-row.active .tl-text { color: var(--c-accent); font-weight: 700; }
+#tl-footer { padding: 8px 14px; border-top: 1px solid var(--c-divider); background: var(--c-title); }
+#tl-info { font-size: 10px; color: var(--c-muted); display: flex; justify-content: space-between; }
+#tl-empty { padding: 32px 16px; text-align: center; color: var(--c-muted); font-size: 12px; line-height: 1.7; }
+
+/* A-B リピート */
+#ab-range { position: absolute; top: 0; height: 100%; display: none; pointer-events: none; border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 40%, transparent); }
+.ab-mark { position: absolute; top: -4px; width: 2px; height: 13px; margin-left: -1px; display: none; pointer-events: none; background: var(--c-accent); }
+#ab-btn.setA, #ab-clear-tab.setA { outline: 1.5px solid var(--c-accent); outline-offset: -1.5px; }
+#ab-btn.on, #ab-clear-tab.on { background: var(--c-accent); color: var(--c-on-accent); }
+
+/* プレイリスト */
+#playlist-panel { padding: 14px 18px; }
+#pl-actions { display: flex; gap: 8px; margin: 6px 0 10px; }
+#pl-list { display: flex; flex-direction: column; gap: 2px; }
+.pl-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; cursor: pointer; }
+.pl-row:hover { background: var(--c-btn-hov); }
+.pl-row.current { background: color-mix(in srgb, var(--c-accent) 14%, transparent); }
+.pl-num { width: 22px; flex-shrink: 0; text-align: right; font-size: 11px; color: var(--c-muted); font-weight: 700; }
+.pl-row.current .pl-num { color: var(--c-accent); }
+.pl-name { flex: 1; min-width: 0; font-size: 13px; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-row.current .pl-name { color: var(--c-accent); font-weight: 700; }
+.pl-del { flex-shrink: 0; width: 30px; height: 30px; border: none; background: none; color: var(--c-muted); font-size: 16px; cursor: pointer; border-radius: 8px; }
+.pl-del:hover { background: var(--c-btn-hov); }
+.pl-empty { padding: 24px 8px; text-align: center; color: var(--c-muted); font-size: 12px; line-height: 1.7; }
+
+/* Settings drawer */
+#drawer { border-top: 1px solid var(--c-divider); background: var(--c-settings); display: none; }
+#drawer.open { display: block; }
+#settings-panel { padding: 14px 18px; }
+.drawer-title { font-size: 12px; font-weight: 800; color: var(--c-sub); margin-bottom: 12px; }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.settings-col-label { font-size: 10px; font-weight: 800; color: var(--c-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; }
+.setting-label { font-size: 11px; color: var(--c-text); }
+.toggle { width: 36px; height: 20px; border-radius: 10px; border: none; background: var(--c-seek); position: relative; cursor: pointer; flex-shrink: 0; transition: background 0.2s; }
+.toggle.on { background: var(--c-accent); }
+.toggle-knob { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left 0.18s; }
+.toggle.on .toggle-knob { left: 19px; background: var(--c-on-accent); }
+
+/* フォントサイズ数値入力 */
+.font-size-input-wrap {
+  display: flex; align-items: center; gap: 5px;
+}
+.font-size-input {
+  width: 54px; padding: 3px 7px; border-radius: 8px;
+  border: 1px solid var(--c-ctrl-border);
+  background: var(--c-panel); color: var(--c-text);
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  text-align: center; outline: none; appearance: none; -moz-appearance: textfield;
+}
+.font-size-input::-webkit-inner-spin-button,
+.font-size-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.font-size-input:focus { border-color: var(--c-accent); }
+.font-size-unit { font-size: 10px; color: var(--c-muted); font-weight: 700; }
+
+.sub-size-btns { display: flex; gap: 3px; }
+.size-btn {
+  padding: 2px 7px; border-radius: 7px; border: 1px solid var(--c-ctrl-border);
+  background: var(--c-tag); color: var(--c-tag-t);
+  font-size: 10px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.12s;
+}
+.size-btn.active { background: var(--c-accent); color: var(--c-on-accent); border-color: var(--c-accent); }
+.pos-select {
+  font-size: 11px; padding: 3px 7px; border-radius: 8px;
+  border: 1px solid var(--c-ctrl-border); background: var(--c-panel); color: var(--c-text); font-family: inherit; cursor: pointer;
+}
+#sc-hint { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--c-divider); font-size: 10px; color: var(--c-muted); line-height: 1.6; }
+
+/* Shortcuts panel */
+#shortcuts-panel { padding: 14px 18px; max-height: 280px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--c-thumb) transparent; }
+#sc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.sc-list { display: flex; flex-direction: column; gap: 2px; }
+.sc-row { display: flex; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 8px; }
+.sc-row:hover { background: var(--c-btn-hov); }
+.sc-label { flex: 1; font-size: 11px; color: var(--c-text); }
+.key-badge {
+  padding: 2px 10px; border-radius: 6px; border: 1px solid var(--c-ctrl-border);
+  background: var(--c-tag); color: var(--c-tag-t);
+  font-size: 10px; font-weight: 800; cursor: pointer;
+  font-family: monospace; white-space: nowrap; min-width: 72px; text-align: center;
+}
+.key-badge:hover { background: var(--c-btn-hov); }
+.key-badge.binding { background: var(--c-accent); color: var(--c-on-accent); border-color: var(--c-accent); }
+#rebind-notice {
+  padding: 7px 12px; border-radius: 10px; margin-bottom: 10px;
+  background: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  border: 1px dashed var(--c-accent);
+  font-size: 12px; color: var(--c-accent); font-weight: 700; text-align: center; display: none;
+}
+#rebind-notice.show { display: block; }
+.sc-footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--c-divider); font-size: 10px; color: var(--c-muted); }
+
+/* Simple mode */
+#simple-wrap {
+  position: fixed; inset: 0; border-radius: 12px;
+  overflow: hidden; background: var(--c-player); display: none; z-index: 999;
+}
+#simple-wrap.show { display: block; }
+#simple-vid { width: 100%; height: 100%; object-fit: contain; }
+#simple-sub {
+  position: absolute; z-index: 5; bottom: 14px; left: 50%; transform: translateX(-50%);
+  color: #fff;
+  font-size: 15px; font-weight: 700; white-space: nowrap; transition: bottom 0.18s;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5);
+  display: none;
+  transition: background-color 0.2s, padding 0.2s, border-radius 0.2s;
+}
+#simple-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.6); font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+#simple-ctrl {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
+  background: var(--c-ctrl); backdrop-filter: blur(20px);
+  border-top: 1px solid var(--c-ctrl-border);
+  padding: 8px 14px; display: flex; align-items: center; gap: 10px;
+  opacity: 0; transition: opacity 0.18s; pointer-events: none;
+}
+#simple-ctrl.show { opacity: 1; pointer-events: auto; }
+#simple-seek { flex: 1; height: 4px; background: var(--c-seek); border-radius: 2px; position: relative; cursor: pointer; }
+#simple-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--c-fill); border-radius: 2px; }
+#simple-time { font-size: 11px; color: var(--c-muted); font-weight: 700; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+</style>
+<link rel="stylesheet" href="android.css">
+</head>
+<body class="no-pip">
+
+<!-- SIMPLE MODE OVERLAY -->
+<div id="simple-wrap">
+  <video id="simple-vid" muted></video>
+  <div id="simple-sub"></div>
+  <div id="simple-badge">SIMPLE</div>
+  <div id="simple-ctrl">
+    <button class="ibtn round" id="simple-play" style="width:32px;height:32px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+    </button>
+    <div id="simple-seek"><div id="simple-fill"></div></div>
+    <span id="simple-time">00:00</span>
+    <input type="range" min="30" max="100" value="100" id="op-slider" style="width:54px;accent-color:var(--c-accent);cursor:pointer" title="不透明度">
+    <button class="ibtn" id="exit-simple" style="width:26px;height:26px" title="通常モードへ">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+    </button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+
+  <!-- Titlebar (Windows style) -->
+  <div id="titlebar">
+    <!-- 左：タイトル + バッジ -->
+    <div class="title-left">
+      <span id="title-name">きゅうり動画</span>
+      <span id="sc-off-badge" style="display:none;font-size:9px;padding:2px 7px;border-radius:8px;background:var(--c-tag);color:var(--c-muted);font-weight:700">SC OFF</span>
+    </div>
+    <!-- 中央：機能ボタン群 -->
+    <div class="title-btns">
+      <button class="ibtn active" id="aot-btn" style="width:26px;height:26px" title="Always on Top (Ctrl+Shift+P)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="17" x2="12" y2="3"></line><polyline points="5 10 12 3 19 10"></polyline><line x1="5" y1="21" x2="19" y2="21"></line></svg>
+      </button>
+      <button class="ibtn" id="sc-btn" style="width:26px;height:26px" title="ショートカット">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"></path></svg>
+      </button>
+      <button class="ibtn" id="settings-btn" style="width:26px;height:26px" title="設定">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+    <!-- 右端：Windows ウィンドウコントロール（－ □ ×） -->
+    <div class="win-ctrl">
+      <button class="win-btn" id="dot-min" title="最小化">
+        <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+      </button>
+      <button class="win-btn" id="dot-max" title="最大化">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor"/></svg>
+      </button>
+      <button class="win-btn" id="dot-close" title="閉じる">
+        <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.4"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div id="body">
+
+    <!-- Video column -->
+    <div class="video-col">
+
+      <!-- Video box -->
+      <div id="videobox">
+        <div class="drop-overlay" id="drop-overlay" style="display:none">
+          <span>動画をドロップ</span>
+        </div>
+        <video id="vid"></video>
+        <div id="empty-state">
+          <div class="icon">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div class="label">動画ファイルをドラッグ＆ドロップ</div>
+          <div class="or">or</div>
+          <button class="open-btn" id="open-btn">ファイルを開く</button>
+        </div>
+        <button id="zoom-chip" type="button" aria-label="拡大をリセット">×1.0  ✕</button>
+        <div id="pause-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" style="margin-left:3px"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        </div>
+        <div id="replay-overlay" role="button" aria-label="もう一度再生">
+          <div class="replay-circle">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 3 3 9 9 9"></polyline></svg>
+          </div>
+          <div class="replay-label">もう一度再生</div>
+        </div>
+        <div id="sub-overlay" class="sub-overlay" style="display:none;font-size:15px"></div>
+        <div class="badge" id="badge-sub" style="display:none">CC OFF</div>
+        <div class="badge" id="badge-audio" style="display:none">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+          <span id="audio-label">—</span>
+        </div>
+        <div class="badge" id="badge-speed" style="display:none">1.25×</div>
+        <!-- ダブルタップ スキップ表示 -->
+        <div class="skip-ui left" id="skip-back">
+          <div class="skip-inner">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"></polyline><polyline points="18 17 13 12 18 7"></polyline></svg>
+            <span class="skip-txt" id="skip-back-txt">10秒</span>
+          </div>
+        </div>
+        <div class="skip-ui right" id="skip-fwd">
+          <div class="skip-inner">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+            <span class="skip-txt" id="skip-fwd-txt">10秒</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div id="controls">
+        <div id="seekbar-wrap">
+          <div id="seekbar-track">
+            <div id="ab-range"></div>
+            <div id="seekbar-fill"></div>
+            <div class="ab-mark" id="ab-mark-a"></div>
+            <div class="ab-mark" id="ab-mark-b"></div>
+            <div id="mk-ticks"></div>
+            <div id="seekbar-thumb"></div>
+          </div>
+          <div id="seek-tooltip">00:00</div>
+        </div>
+
+        <div id="btn-row">
+          <!-- 1段目: 再生操作 + 時間 -->
+          <div class="row-transport">
+            <button class="ibtn" id="b30" style="width:26px;height:26px" title="30秒戻る" disabled>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="11 17 6 12 11 7"></polyline><polyline points="18 17 13 12 18 7"></polyline></svg>
+            </button>
+            <button class="ibtn" id="b5" style="width:28px;height:28px" title="5秒戻る" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+            </button>
+            <button class="ibtn round" id="play-btn" style="width:36px;height:36px" title="再生/停止" disabled>
+              <svg id="play-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+            <button class="ibtn" id="f5" style="width:28px;height:28px" title="5秒進む" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+            </button>
+            <button class="ibtn" id="f30" style="width:26px;height:26px" title="30秒進む" disabled>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+            </button>
+            <span id="time-display">00:00 / 00:00</span>
+          </div>
+
+          <!-- 2段目: 設定系 / 表示系 -->
+          <div class="row-tools">
+            <div class="grp">
+              <button class="ibtn" id="vol-btn" style="width:26px;height:26px" title="ミュート">
+                <svg id="vol-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              </button>
+
+              <div class="pop-wrap">
+                <button class="tag-btn" id="speed-btn">1x <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                <div class="pop-menu" id="speed-menu">
+                  <div class="pop-item" data-val="0.75">0.75x</div>
+                  <div class="pop-item selected" data-val="1">1x</div>
+                  <div class="pop-item" data-val="1.25">1.25x</div>
+                  <div class="pop-item" data-val="1.5">1.5x</div>
+                  <div class="pop-item" data-val="2">2x</div>
+                </div>
+              </div>
+
+              <div class="pop-wrap">
+                <button class="tag-btn" id="cc-btn" style="gap:4px">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+                  CC
+                </button>
+                <div class="pop-menu" id="cc-menu" style="min-width:170px">
+                  <div class="pop-item" data-val="-1">字幕オフ</div>
+                </div>
+              </div>
+
+              <div class="pop-wrap">
+                <button class="tag-btn" id="audio-btn" style="gap:4px">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                  <span class="lbl">Audio</span>
+                </button>
+                <div class="pop-menu" id="audio-menu" style="min-width:170px">
+                  <div class="pop-item selected" data-val="0">—</div>
+                </div>
+              </div>
+              <button class="tag-btn" id="mk-quick" title="今の位置をタイムスタンプに保存" aria-label="タイムスタンプに保存"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15.5 14"></polyline></svg></button>
+              <button class="tag-btn" id="mk-quick-ab" title="今の位置を A / B に保存（B を打つとループとして保存）">A-B保存</button>
+              <button class="tag-btn" id="ab-btn" title="A-B 解除">A-B解除</button>
+              <button class="tag-btn" id="eq-btn" title="イコライザー">EQ</button>
+              <button class="tag-btn" id="comp-btn" title="コンプレッサー（音量の均一化）・音量ブースト">COMP</button>
+            </div>
+
+            <div class="grp">
+              <button class="ibtn" id="pl-btn" style="width:26px;height:26px" title="プレイリスト">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="15" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="11" y2="18"></line><polygon points="17 13 22 17 17 21 17 13" fill="currentColor"></polygon></svg>
+              </button>
+              <button class="ibtn active" id="tl-btn" style="width:26px;height:26px" title="タイムライン">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+              </button>
+              <button class="ibtn" id="simple-btn" style="width:26px;height:26px" title="シンプルモード">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              </button>
+              <!-- 画面を横/縦に切り替え -->
+              <button class="ibtn" id="rotate-btn" style="width:26px;height:26px" title="画面の向きを切り替え">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path><rect x="9" y="8.5" width="6" height="7" rx="1"></rect></svg>
+              </button>
+              <!-- 画面ロック（誤タップ防止） -->
+              <button class="ibtn" id="lock-btn" style="width:26px;height:26px" title="画面ロック（誤タップ防止）" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+              </button>
+              <!-- 映像を再読み込み（映像が黒いまま戻らないとき） -->
+              <button class="ibtn" id="refresh-btn" style="width:26px;height:26px" title="映像を再読み込み" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              </button>
+              <!-- 小窓（ピクチャ イン ピクチャ） -->
+              <button class="ibtn" id="pip-btn" style="width:26px;height:26px" title="小窓で再生" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="12" width="8" height="5" rx="1" fill="currentColor"></rect></svg>
+              </button>
+              <!-- 全画面 -->
+              <button class="ibtn" id="fs-btn" style="width:26px;height:26px" title="全画面">
+                <svg id="fs-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline panel (embedded) -->
+    <div id="timeline">
+      <div id="tl-header">
+        <div id="tl-tabs" role="tablist">
+          <button type="button" class="tl-tab active" data-tab="sub" role="tab">字幕</button>
+          <button type="button" class="tl-tab" data-tab="ts" role="tab">タイムスタンプ<span class="tl-tab-n" id="mk-count-ts"></span></button>
+          <button type="button" class="tl-tab" data-tab="ab" role="tab">A-B<span class="tl-tab-n" id="mk-count-ab"></span></button>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center">
+          <button class="tag-btn" id="detach-tl-btn" style="font-size:10px;padding:3px 8px;gap:3px" title="別ウィンドウ (Ctrl+Shift+T)">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            分離
+          </button>
+          <button class="ibtn" id="close-tl" style="width:22px;height:22px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+      <div id="tl-list">
+        <div id="tl-empty">ファイルを開くと<br/>字幕一覧が表示されます</div>
+      </div>
+      <div id="tl-ts" class="tl-pane">
+        <div class="mk-bar">
+          <button class="tag-btn" id="mk-add">＋ 今の位置を保存</button>
+        </div>
+        <div id="mk-list"></div>
+        <div class="mk-foot"><button class="tag-btn mk-clear-cur">この動画の記録を削除</button></div>
+      </div>
+      <div id="tl-ab" class="tl-pane">
+        <div class="mk-bar">
+          <button class="tag-btn" id="mk-add-ab">＋ 今の位置をAに保存</button>
+          <button class="tag-btn" id="mk-save-loop">今の A-B を保存</button>
+        </div>
+        <div class="mk-bar mk-bar-sub"><span class="mk-now" id="mk-ab-now"></span><button class="tag-btn" id="ab-clear-tab" title="A-B 解除">A-B解除</button></div>
+        <div id="mk-loops"></div>
+        <div class="mk-foot"><button class="tag-btn mk-clear-cur">この動画の記録を削除</button></div>
+      </div>
+      <div id="tl-footer">
+        <div id="tl-info"><span id="tl-count">—</span><span id="tl-track">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings / Shortcuts drawer -->
+  <div id="drawer">
+    <div id="settings-panel" style="display:none">
+      <div class="drawer-title">設定</div>
+      <div class="settings-grid">
+        <div>
+          <div class="settings-col-label">表示</div>
+          <div class="setting-row desktop-only">
+            <span class="setting-label">常に最前面（プレイヤー）</span>
+            <button class="toggle on" data-toggle="aot"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row desktop-only">
+            <span class="setting-label">常に最前面（タイムライン）</span>
+            <button class="toggle on" data-toggle="aot-tl"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">字幕オーバーレイ</span>
+            <button class="toggle on" data-toggle="sub"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">タイムラインパネル</span>
+            <button class="toggle on" data-toggle="tl"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row desktop-only">
+            <span class="setting-label">ショートカット全体</span>
+            <button class="toggle on" data-toggle="sc"><div class="toggle-knob"></div></button>
+          </div>
+
+          <div class="settings-col-label" style="margin-top:10px">操作・再生</div>
+          <div class="setting-row">
+            <span class="setting-label">スキップの単位</span>
+            <div class="sub-size-btns">
+              <button class="size-btn active" data-skipunit="sec">秒数</button>
+              <button class="size-btn" data-skipunit="frame">フレーム</button>
+            </div>
+          </div>
+          <div class="setting-row skip-frames-row">
+            <span class="setting-label">1回で動かすフレーム数</span>
+            <div class="font-size-input-wrap">
+              <input type="number" id="skip-frames-input" class="font-size-input"
+                     min="1" max="300" value="1" step="1" inputmode="numeric">
+              <span class="font-size-unit">枚</span>
+            </div>
+          </div>
+          <div class="setting-row skip-frames-row">
+            <div class="sub-size-btns">
+              <button class="size-btn active" data-skipframes="1">1</button>
+              <button class="size-btn" data-skipframes="2">2</button>
+              <button class="size-btn" data-skipframes="5">5</button>
+              <button class="size-btn" data-skipframes="10">10</button>
+              <button class="size-btn" data-skipframes="30">30</button>
+            </div>
+          </div>
+          <div class="setting-row" style="margin-top:-4px">
+            <span class="setting-label" style="font-size:11px;opacity:0.65;white-space:normal;line-height:1.5">「フレーム」にすると、ダブルタップと ◀|▶ ボタンが、上で指定した枚数ぶんのコマ送り／コマ戻しになります（再生は一時停止します）。±30秒ボタンは秒数のままです</span>
+          </div>
+          <div class="setting-row dt-sec-row">
+            <span class="setting-label">ダブルタップでスキップする秒数</span>
+            <div class="font-size-input-wrap">
+              <input type="number" id="dt-sec-input" class="font-size-input"
+                     min="1" max="300" value="10" step="1" inputmode="numeric">
+              <span class="font-size-unit">秒</span>
+            </div>
+          </div>
+          <div class="setting-row dt-sec-row">
+            <div class="sub-size-btns">
+              <button class="size-btn" data-dtsec="5">5秒</button>
+              <button class="size-btn active" data-dtsec="10">10秒</button>
+              <button class="size-btn" data-dtsec="15">15秒</button>
+              <button class="size-btn" data-dtsec="30">30秒</button>
+              <button class="size-btn" data-dtsec="60">60秒</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">全画面: タップでコントロールを隠す（iPhone 式）</span>
+            <button class="toggle" data-toggle="tap-hide" aria-label="iPhone 式タップ"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row" style="margin-top:-4px">
+            <span class="setting-label" style="font-size:11px;opacity:0.65;white-space:normal;line-height:1.5">オンにすると、全画面で再生中に画面を 1 回タップするとシークバーやボタンが消え、消えている状態でもう 1 回タップすると一時停止します。停止中のタップは再生です。ダブルタップのスキップは今までどおり使えます</span>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">画面の向き</span>
+            <select class="pos-select" id="orient-sel">
+              <option value="auto">自動（端末に従う）</option>
+              <option value="landscape">横向きに固定</option>
+              <option value="portrait">縦向きに固定</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">イヤホンを抜いたら一時停止</span>
+            <button class="toggle on" data-toggle="unplug-pause"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">画面を消しても音声を再生し続ける</span>
+            <button class="toggle on" data-toggle="bg-play"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">連続再生（プレイリストの次の動画へ自動で進む）</span>
+            <button class="toggle" data-toggle="continuous"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">くり返し再生</span>
+            <select class="pos-select repeat-sel">
+              <option value="off">しない</option>
+              <option value="one">1 本をくり返す</option>
+              <option value="all">プレイリスト全体をくり返す</option>
+            </select>
+          </div>
+          <div class="setting-row" style="margin-top:-4px">
+            <span class="setting-label" style="font-size:11px;opacity:0.65;white-space:normal;line-height:1.5">「全体」は最後の動画のあと先頭へ戻ります（連続再生がオフでも次の動画へ進みます）。1 本だけ開いているときは、その動画をくり返します</span>
+          </div>
+          <div class="setting-row pip-only">
+            <span class="setting-label">ホームに戻ると小窓で再生</span>
+            <button class="toggle on" data-toggle="pip-auto"><div class="toggle-knob"></div></button>
+          </div>
+        </div>
+        <div>
+          <div class="settings-col-label">字幕スタイル</div>
+          <div class="setting-row">
+            <span class="setting-label">表示位置</span>
+            <select class="pos-select" id="sub-pos-sel">
+              <option value="bottom-center">下部中央</option>
+              <option value="top-center">上部中央</option>
+              <option value="bottom-left">下部左</option>
+              <option value="bottom-right">下部右</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">テロップ背景</span>
+            <button class="toggle" data-toggle="sub-bg"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">フォントサイズ</span>
+            <div class="font-size-input-wrap">
+              <input type="number" id="sub-fontsize-input" class="font-size-input"
+                     min="8" max="72" value="15" step="1">
+              <span class="font-size-unit">px</span>
+            </div>
+          </div>
+          <div class="settings-col-label" style="margin-top:10px">タイムスタンプ・A-B の記録</div>
+          <div class="setting-row">
+            <span class="setting-label">全画面のコントロールに「時計（保存）」「A-B保存」「A-B解除」ボタンを表示</span>
+            <button class="toggle on" id="mk-quick-toggle" aria-label="「保存」ボタンの表示"><div class="toggle-knob"></div></button>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">自動削除（最後に開いてから）</span>
+            <select class="pos-select" id="marks-retention">
+              <option value="7">7 日</option>
+              <option value="30">30 日</option>
+              <option value="90">90 日</option>
+              <option value="0">無制限</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label marks-stats" id="marks-stats"></span>
+            <button class="tag-btn" id="marks-clear-all" title="すべての動画のタイムスタンプ・A-B の記録を削除">記録を削除</button>
+          </div>
+          <div class="setting-row" style="margin-top:-4px">
+            <span class="setting-label" style="font-size:11px;opacity:0.65;white-space:normal;line-height:1.5">保存期間を過ぎた動画の記録は、アプリを起動したときと、この設定を変えたときに自動で削除されます。再生位置の記録は対象外です</span>
+          </div>
+
+          <div class="settings-col-label" style="margin-top:10px">再生速度</div>
+          <div class="setting-row">
+            <div class="sub-size-btns">
+              <button class="size-btn" data-speed="0.75">0.75x</button>
+              <button class="size-btn active" data-speed="1">1x</button>
+              <button class="size-btn" data-speed="1.25">1.25x</button>
+              <button class="size-btn" data-speed="1.5">1.5x</button>
+              <button class="size-btn" data-speed="2">2x</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="sc-hint" class="desktop-only">Space=再生/停止 · ←→=±5秒 · Shift+←→=±30秒 · ↑↓=音量 · [ ]=速度 · T=タイムライン · S=字幕 · M=ミュート · F=全画面</div>
+    </div>
+
+    <div id="shortcuts-panel" style="display:none">
+      <div id="sc-header">
+        <span class="drawer-title" style="margin-bottom:0">ショートカットキー</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="setting-label">全体 ON/OFF</span>
+          <button class="toggle on" id="sc-toggle2"><div class="toggle-knob"></div></button>
+        </div>
+      </div>
+      <div id="rebind-notice">キーを押してください… <button id="cancel-rebind-btn" style="margin-left:8px;background:none;border:none;color:var(--c-muted);cursor:pointer;font-size:11px">キャンセル</button></div>
+      <div class="sc-list" id="sc-list"></div>
+      <div class="sc-footer">キーバッジをクリックして任意のキーに再割り当てできます</div>
+    </div>
+
+    <div id="playlist-panel" style="display:none">
+      <div class="drawer-title">プレイリスト <span id="pl-count"></span></div>
+      <div class="setting-row">
+        <span class="setting-label">連続再生（最後まで再生したら次へ進む）</span>
+        <button class="toggle" data-toggle="continuous"><div class="toggle-knob"></div></button>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">くり返し再生</span>
+        <select class="pos-select repeat-sel">
+          <option value="off">しない</option>
+          <option value="one">1 本をくり返す</option>
+          <option value="all">プレイリスト全体をくり返す</option>
+        </select>
+      </div>
+      <div id="pl-actions">
+        <button class="tag-btn" id="pl-add">＋ 追加</button>
+        <button class="tag-btn" id="pl-clear">すべて削除</button>
+      </div>
+      <div id="pl-list"></div>
+      <div class="sc-footer">ファイル選択で動画を長押しすると、複数まとめて選べます（ファイル名順に並びます）</div>
+    </div>
+
+    <div id="eq-panel" style="display:none">
+      <div class="eq-head">
+        <div class="drawer-title" style="margin-bottom:0">イコライザー</div>
+        <div class="eq-head-right">
+          <span class="bypass-lbl">効果</span>
+          <button class="toggle" id="eq-toggle" aria-label="イコライザーのオン/オフ"><div class="toggle-knob"></div></button>
+          <button class="size-btn" id="eq-close">閉じる</button>
+        </div>
+      </div>
+      <div id="eq-body">
+        <div class="setting-row">
+          <span class="setting-label">プリセット</span>
+          <select class="pos-select" id="eq-preset-sel"></select>
+        </div>
+        <div class="setting-row eq-save-row">
+          <input type="text" id="eq-name-input" class="eq-name-input" maxlength="20" placeholder="今の設定に名前をつけて保存" autocomplete="off">
+          <button class="tag-btn" id="eq-save">保存</button>
+          <button class="tag-btn" id="eq-del">削除</button>
+          <button class="tag-btn" id="eq-reset">リセット</button>
+        </div>
+        <div class="setting-row eq-pre-row">
+          <span class="setting-label">プリアンプ</span>
+          <input type="range" id="eq-preamp" min="-12" max="12" step="0.5" value="0">
+          <span class="eq-val" id="eq-preamp-val">0 dB</span>
+        </div>
+        <div class="setting-row eq-spec-row">
+          <span class="setting-label">アナライザー</span>
+          <span class="eq-spec-hint" id="eq-spec-hint">再生中の音の強さを、フェーダーの背面に表示します</span>
+          <button class="toggle on" id="eq-spec-toggle" aria-label="アナライザーのオン/オフ"><div class="toggle-knob"></div></button>
+        </div>
+        <div class="setting-row eq-solo-row">
+          <span class="setting-label">帯域ソロ</span>
+          <div class="sub-size-btns eq-solo-chips">
+            <button type="button" class="size-btn" data-solo="bass">ベース</button>
+            <button type="button" class="size-btn" data-solo="vocal">ボーカル</button>
+            <button type="button" class="size-btn" data-solo="high">高域</button>
+            <button type="button" class="size-btn" id="eq-solo-off">解除</button>
+          </div>
+        </div>
+        <div class="eq-spec-hint eq-solo-hint" id="eq-solo-hint"></div>
+        <div id="eq-bands"></div>
+        <div class="eq-note">プリセットを選ぶか、スライダーを動かすと自動でオンになります。右上の「効果」をオフにすると、設定を残したままバイパス（効果なし）になります。上が音を強く、下が弱くする方向です（±12 dB）。音が割れるときは「プリアンプ」を下げてください。<br>「帯域ソロ」は、選んだ帯域以外を約 -20 dB（これ以上は下げられません）まで下げるだけの簡易的な聴き分けです。完全には消えず、ソロ中は他の帯域の音が小さく残ります。ソロは保存されず、アプリを開き直すと解除されます。</div>
+      </div>
+    </div>
+
+    <div id="comp-panel" style="display:none">
+      <div class="eq-head">
+        <div class="drawer-title" style="margin-bottom:0">コンプレッサー</div>
+        <div class="eq-head-right">
+          <span class="bypass-lbl">効果</span>
+          <button class="toggle" id="cp-toggle" aria-label="コンプレッサーのオン/オフ"><div class="toggle-knob"></div></button>
+          <button class="size-btn" id="comp-close">閉じる</button>
+        </div>
+      </div>
+      <div id="comp-body">
+        <div class="setting-row">
+          <span class="setting-label">プリセット</span>
+          <select class="pos-select" id="cp-preset-sel"></select>
+          <button class="tag-btn" id="cp-reset" title="初期値（標準）に戻す">リセット</button>
+        </div>
+        <div id="cp-graph-wrap">
+          <canvas id="cp-graph" aria-label="コンプレッサーの入力と出力のグラフ"></canvas>
+          <div class="cp-legend">
+            <span><i style="background:#3ddc84"></i>そのまま</span>
+            <span><i style="background:#4aa3ff"></i>なめらかに移行</span>
+            <span><i style="background:#ff5a5a"></i>圧縮される音</span>
+            <span><i class="dot"></i>今の音量</span>
+          </div>
+          <div class="cp-summary" id="cp-summary"></div>
+        </div>
+        <div class="setting-row cp-row">
+          <span class="setting-label">しきい値</span>
+          <input type="range" id="cp-threshold" min="-30" max="0" step="1" value="-20">
+          <span class="eq-val" id="cp-threshold-val"></span>
+        </div>
+        <div class="setting-row cp-row">
+          <span class="setting-label">圧縮比</span>
+          <input type="range" id="cp-ratio" min="1" max="20" step="0.5" value="4">
+          <span class="eq-val" id="cp-ratio-val"></span>
+        </div>
+        <div class="setting-row cp-row">
+          <span class="setting-label">アタック</span>
+          <input type="range" id="cp-attack" min="2" max="400" step="1" value="20">
+          <span class="eq-val" id="cp-attack-val"></span>
+        </div>
+        <div class="setting-row cp-row">
+          <span class="setting-label">リリース</span>
+          <input type="range" id="cp-release" min="10" max="800" step="10" value="250">
+          <span class="eq-val" id="cp-release-val"></span>
+        </div>
+        <div class="setting-row cp-row">
+          <span class="setting-label">ニー</span>
+          <input type="range" id="cp-knee" min="1" max="10" step="0.5" value="4">
+          <span class="eq-val" id="cp-knee-val"></span>
+        </div>
+        <div class="setting-row cp-row">
+          <span class="setting-label">出力ゲイン</span>
+          <input type="range" id="cp-makeup" min="0" max="24" step="0.5" value="6">
+          <span class="eq-val" id="cp-makeup-val"></span>
+        </div>
+        <div class="setting-row cp-row">
+          <span class="setting-label">検出方式</span>
+          <input type="range" id="cp-rmspeak" min="0" max="1" step="0.1" value="0.2">
+          <span class="eq-val" id="cp-rmspeak-val"></span>
+        </div>
+        <div class="eq-note">大きい音を抑え、小さい音を持ち上げて音量を均一にします（映画の「セリフは小さいのに爆発音だけ大きい」対策）。プリセットを選ぶか、スライダーを動かすと自動でオンになります。右上の「効果」をオフにすると、設定を残したままバイパス（効果なし）になります。<b>適用のたびに動画を同じ位置から開き直すため、音が 0.5〜1 秒途切れ、映像も一瞬乱れます</b>（スライダーは指を離したときに 1 回だけ適用）。音が割れるときは「出力ゲイン」を下げてください。</div>
+        <div id="boost-row" class="setting-row cp-row">
+          <span class="setting-label">音量ブースト（最大 200%）</span>
+          <input type="range" id="boost-level" min="100" max="200" step="5" value="100">
+          <span class="eq-val" id="boost-level-val">100%</span>
+          <button class="tag-btn" id="boost-reset">100%</button>
+        </div>
+        <div class="eq-note" id="boost-note">音量ブーストは再生中にその場で反映されます（途切れません）。100% を超えると音が割れることがあります。耳や機器を傷めないよう、上げすぎにご注意ください。</div>
+      </div>
+    </div>
+  </div>
+
+<div id="toast"></div>
+
+<!-- 画面ロック中: タッチを全て受け止める透明な膜。タップすると解除ボタンが現れ、長押しで解除 -->
+<div id="lock-overlay">
+  <div id="lock-chip">
+    <button id="lock-unlock" aria-label="長押しで解除">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+      <span id="lock-ring"></span>
+    </button>
+    <div id="lock-hint">ロック中 — 長押しで解除</div>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<script src="mkv-subs.js"></script>
+<script src="android-shim.js"></script>
+<script src="native-video.js"></script>
+<script src="equalizer.js"></script>
+<script src="marks.js"></script>
+<script src="compressor.js"></script>
+<script src="player.js"></script>
+<script src="zoom.js"></script>
+</body>
+</html>

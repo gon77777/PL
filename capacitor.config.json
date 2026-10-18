@@ -1,0 +1,6 @@
+{
+  "appId": "com.mkvplayer.app",
+  "appName": "きゅうり動画",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

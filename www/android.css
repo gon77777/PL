@@ -1,0 +1,322 @@
+/* ═══════════════════════════════════════════════
+   Android 向け調整
+   index.html のインライン CSS（Electron 版由来）より後に読み込まれ、上書きする
+   ═══════════════════════════════════════════════ */
+:root { --tb: 44px; } /* タイトルバーの高さ */
+
+html, body { height: 100%; }
+body {
+  height: 100%; height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--c-app, #fff);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+#app { position: relative; border-radius: 0; border: 0; box-shadow: none; min-height: 0; min-width: 0; }
+
+/* ── デスクトップ専用の UI は Android では非表示 ── */
+.win-ctrl, #aot-btn, #sc-btn, #detach-tl-btn, #simple-btn, #sc-off-badge, .desktop-only { display: none !important; }
+.no-pip #pip-btn, .no-pip .pip-only { display: none !important; } /* PiP 非対応端末 */
+
+/* ── タイトルバー ── */
+#titlebar { -webkit-app-region: no-drag; height: var(--tb); flex-shrink: 0; }
+#title-name { font-size: 13px; }
+.title-btns { gap: 6px; padding: 0 8px 0 4px; }
+
+/* ── タッチしやすいボタンサイズ ── */
+.ibtn, .tag-btn { min-width: 36px; min-height: 36px; }
+.tag-btn { justify-content: center; padding: 4px 10px; font-size: 12px; }
+#play-btn { min-width: 44px; min-height: 44px; }
+.ibtn:hover { transform: none; }          /* タッチ端末では hover 拡大を無効化 */
+#videobox, #controls { touch-action: manipulation; }
+
+/* ═══════════════ 基本レイアウト ═══════════════ */
+#body { flex: 1; min-height: 0; min-width: 0; }
+.video-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#videobox { min-height: 0; }
+#timeline { min-height: 0; }
+
+/* 縦持ち: YouTube のように 16:9 の動画の下にコントロール → タイムライン */
+@media (orientation: portrait) {
+  #body { flex-direction: column; }
+  .video-col { flex: 0 0 auto; width: 100%; }
+  #videobox { flex: none; width: 100%; aspect-ratio: 16 / 9; max-height: 52dvh; }
+  #timeline { width: 100%; flex: 1 1 0; border-left: 0; border-top: 1px solid var(--c-divider); }
+  /* タイムラインを閉じたら動画を広げる */
+  body.tl-off .video-col { flex: 1 1 0; }
+  body.tl-off #videobox { flex: 1 1 0; aspect-ratio: auto; max-height: none; }
+}
+
+/* 横持ち: 左に動画、右にタイムライン */
+@media (orientation: landscape) {
+  :root { --tb: 34px; }
+  #body { flex-direction: row; }
+  .video-col { flex: 1 1 0; }
+  #videobox { flex: 1 1 0; }
+  #timeline { width: min(260px, 36vw); flex: 0 0 auto; }
+  #controls { padding-top: 2px; }
+}
+
+/* ═══════════════ コントロール（はみ出し対策） ═══════════════ */
+#controls {
+  position: relative;            /* ポップアップメニューの基準 */
+  flex-shrink: 0; min-width: 0;
+  padding: 4px 10px 8px;
+}
+#seekbar-wrap { height: 30px; margin-bottom: 0; touch-action: none; } /* 指で掴みやすい高さ */
+#seekbar-track { height: 5px; }
+#seekbar-thumb { width: 16px; height: 16px; }
+#seek-tooltip { bottom: 30px; }
+
+#btn-row { display: flex; flex-direction: column; min-width: 0; }
+.row-transport, .row-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; min-width: 0; }
+.row-tools { justify-content: space-between; }
+.grp { display: flex; align-items: center; gap: 2px; min-width: 0; }
+#time-display { margin-left: auto; min-width: 0; padding-right: 4px; text-align: right; font-size: 12px; }
+
+/* ポップアップは各ボタンではなく #controls の右端基準にして、画面外へのはみ出しを防ぐ */
+.pop-wrap { position: static; }
+.pop-menu {
+  bottom: 100%; right: 8px; margin-bottom: 6px;
+  max-height: 50dvh; overflow-y: auto; max-width: calc(100vw - 16px);
+}
+.pop-item { padding: 10px 16px; font-size: 13px; }
+
+@media (max-width: 420px) {
+  #audio-btn .lbl { display: none; }   /* 狭い画面では Audio ボタンをアイコンのみに */
+  .tag-btn { padding: 4px 8px; }
+}
+
+/* ═══════════════ ダブルタップ スキップ表示 ═══════════════ */
+.skip-ui {
+  position: absolute; top: 0; bottom: 0; width: 42%; z-index: 6;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; background: rgba(255, 255, 255, 0.20);
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+.skip-ui.left  { left: 0;  border-radius: 0 999px 999px 0; }
+.skip-ui.right { right: 0; border-radius: 999px 0 0 999px; }
+.skip-ui.show { opacity: 1; }
+.skip-inner { display: flex; flex-direction: column; align-items: center; gap: 2px; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+.skip-txt { font-size: 14px; font-weight: 800; }
+
+/* ═══════════════ トースト ═══════════════ */
+#toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1000;
+  max-width: 88%; padding: 8px 16px; border-radius: 16px; text-align: center;
+  background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 12px; font-weight: 700; line-height: 1.5;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+#toast.show { opacity: 1; }
+
+/* ═══════════════ 設定（全画面オーバーレイ表示） ═══════════════ */
+#drawer {
+  position: absolute; left: 0; right: 0; top: var(--tb); bottom: 0; z-index: 500;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+#settings-panel, #shortcuts-panel, #playlist-panel { padding: 14px 16px 28px; max-height: none; }
+.pl-row { min-height: 44px; }
+.pl-name { font-size: 14px; }
+.settings-grid { grid-template-columns: 1fr; gap: 14px 0; }
+@media (orientation: landscape) { .settings-grid { grid-template-columns: 1fr 1fr; gap: 0 24px; } }
+.setting-row { min-height: 40px; }
+.setting-label { font-size: 13px; }
+.toggle { width: 44px; height: 24px; border-radius: 12px; }
+.toggle-knob { top: 3px; left: 3px; width: 18px; height: 18px; }
+.toggle.on .toggle-knob { left: 23px; }
+.font-size-input { width: 64px; padding: 6px 8px; font-size: 14px; }
+.pos-select { font-size: 13px; padding: 6px 8px; }
+.size-btn { padding: 7px 11px; font-size: 12px; }
+
+/* ═══════════════ 全画面 ═══════════════ */
+body.fs { padding: 0; background: #000; }
+body.fs #app { background: #000; }
+body.fs #titlebar, body.fs #timeline, body.fs #drawer { display: none !important; }
+body.fs #body { flex-direction: row; }
+body.fs .video-col { flex: 1 1 0; width: 100%; height: 100%; position: relative; }
+body.fs #videobox { flex: 1 1 0; width: 100%; height: 100%; max-height: none; aspect-ratio: auto; background: #000; }
+
+/* コントロールは動画に重ねて表示し、再生中は数秒で自動的に隠す */
+body.fs #controls {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0));
+  border-top: 0; backdrop-filter: none; -webkit-backdrop-filter: none;
+  padding: 18px 14px calc(8px + env(safe-area-inset-bottom));
+  transition: opacity 0.2s;
+}
+body.fs.hide-ctrl #controls { opacity: 0; pointer-events: none; }
+body.fs #controls .ibtn:not(.round) { color: #fff; }
+body.fs #controls .tag-btn { background: rgba(255,255,255,0.20); color: #fff; }
+body.fs #time-display { color: #fff; }
+body.fs #seekbar-track { background: rgba(255,255,255,0.32); }
+body.fs #seekbar-thumb { background: #fff; }
+body.fs #controls .ibtn.active { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.35); }
+/* コントロール表示中は字幕がコントロールに隠れないよう持ち上げる */
+body.fs:not(.hide-ctrl) #sub-overlay { margin-bottom: 104px; }
+
+/* ═══════════════ 小窓（PiP）表示中: 動画だけを表示 ═══════════════ */
+body.pip { padding: 0 !important; background: #000 !important; }
+body.pip #app { background: #000 !important; }
+body.pip #titlebar, body.pip #controls, body.pip #timeline, body.pip #drawer,
+body.pip .badge, body.pip .skip-ui, body.pip #pause-icon, body.pip #toast { display: none !important; }
+body.pip .video-col { flex: 1 1 0 !important; width: 100% !important; height: 100% !important; }
+body.pip #videobox { position: fixed !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-height: none !important; aspect-ratio: auto !important; z-index: 9999; background: #000; }
+body.pip #sub-overlay { font-size: 11px !important; bottom: 6px !important; margin-bottom: 0 !important; max-width: 96%; }
+
+/* ═══════════════ libVLC(ネイティブ)再生時: 映像は WebView の背面に描画される ═══════════════
+   動画エリア(#videobox)とその祖先を透明にして背面の映像を見せ、操作部分は不透明にする。 */
+body.native, body.native #app, body.native #body, body.native .video-col { background: transparent !important; }
+body.native { border: 0; }
+body.native #videobox.loaded { background: transparent !important; }
+body.native #titlebar { background: var(--c-app); }
+body.native #timeline { background: var(--c-panel); }
+body.native #drawer { background: var(--c-app); }
+body.native:not(.fs) #controls { background: var(--c-app); backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.native #empty-state { background: transparent; }
+
+/* ═══════════════ 画面ロック（誤タップ防止） ═══════════════ */
+#lock-overlay {
+  display: none; position: fixed; inset: 0; z-index: 3000;
+  touch-action: none; -webkit-user-select: none; user-select: none;
+}
+body.locked #lock-overlay { display: block; }
+body.locked #controls { opacity: 0.35; }
+body.locked.fs #controls { opacity: 0; }
+#lock-chip {
+  position: absolute; left: 50%; bottom: calc(56px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+#lock-chip.show { opacity: 1; pointer-events: auto; }
+#lock-unlock {
+  position: relative; width: 64px; height: 64px; border-radius: 50%; border: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.72); color: #fff; touch-action: none;
+}
+#lock-ring {
+  position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#fff var(--p, 0%), transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+}
+#lock-hint {
+  padding: 5px 12px; border-radius: 14px; background: rgba(0,0,0,0.72); color: #fff;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+body.pip #lock-overlay { display: none !important; }
+
+/* ═══════════════ イコライザー ═══════════════ */
+#eq-panel, #comp-panel { padding: 14px 16px 28px; }
+.eq-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.eq-head-right { display: flex; align-items: center; gap: 12px; }
+#eq-body { transition: opacity 0.2s; }
+#eq-panel.off #eq-body { opacity: 0.5; }
+#comp-body { transition: opacity 0.2s; }
+#comp-panel.off .cp-row:not(#boost-row) { opacity: 0.5; }
+#eq-preset-sel, #cp-preset-sel { flex: 1 1 0; min-width: 0; max-width: 68%; }
+.eq-save-row { gap: 6px; }
+.eq-name-input {
+  flex: 1 1 0; min-width: 0; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--c-ctrl-border); background: var(--c-panel); color: var(--c-text);
+  font-family: inherit; font-size: 13px; outline: none;
+}
+.eq-name-input:focus { border-color: var(--c-accent); }
+.eq-save-row .tag-btn { padding: 8px 12px; font-size: 12px; flex-shrink: 0; justify-content: center; }
+.eq-save-row .tag-btn:disabled { opacity: 0.35; cursor: default; }
+#eq-btn.on, #comp-btn.on { background: var(--c-accent); color: var(--c-on-accent); }
+.eq-pre-row, .cp-row { gap: 10px; }
+.cp-row .setting-label { width: 4.6em; flex-shrink: 0; }
+.cp-row input[type=range] { flex: 1 1 0; min-width: 0; accent-color: var(--c-accent); }
+.cp-row .eq-val { min-width: 76px; }
+/* コンプレッサーの入出力グラフ */
+#cp-graph-wrap { margin: 4px 0 10px; }
+#cp-graph { display: block; width: 100%; height: 170px; border-radius: 10px; background: #0a0f0c; border: 1px solid var(--c-ctrl-border); }
+.cp-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 10px; font-weight: 700; color: var(--c-muted); }
+.cp-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.cp-legend i.dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 4px rgba(255,255,255,0.8); }
+.cp-summary { margin-top: 4px; font-size: 11px; line-height: 1.6; color: var(--c-sub); font-variant-numeric: tabular-nums; }
+.cp-summary.warn { color: var(--c-accent); }
+@media (orientation: landscape) and (max-height: 480px) { #cp-graph { height: 120px; } }
+.bypass-lbl { font-size: 11px; font-weight: 700; color: var(--c-sub); }
+#cp-preset-sel { max-width: 52%; }
+#cp-reset, #boost-reset { padding: 6px 10px; font-size: 12px; flex-shrink: 0; justify-content: center; }
+.eq-pre-row input[type=range] { flex: 1 1 0; min-width: 0; accent-color: var(--c-accent); }
+.eq-val { min-width: 56px; text-align: right; font-size: 12px; font-weight: 700; color: var(--c-sub); font-variant-numeric: tabular-nums; }
+#eq-bands { position: relative; display: flex; gap: 2px; margin-top: 10px; }
+.eq-band { position: relative; z-index: 1; }
+#eq-spectrum { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; }
+.eq-spec-row { gap: 10px; }
+.eq-spec-hint { flex: 1 1 0; min-width: 0; font-size: 11px; color: var(--c-muted); line-height: 1.4; }
+.eq-spec-hint.warn { color: var(--c-accent); }
+.eq-band { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.eq-db { height: 14px; font-size: 10px; font-weight: 700; color: var(--c-sub); font-variant-numeric: tabular-nums; }
+.eq-hz { font-size: 10px; font-weight: 700; color: var(--c-muted); }
+.eq-track { position: relative; width: 100%; height: 176px; touch-action: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.eq-lane { position: absolute; left: 0; right: 0; top: 11px; bottom: 11px; }
+.eq-lane::before { content: ''; position: absolute; left: 18%; right: 18%; top: 50%; height: 1px; background: var(--c-divider); } /* 0 dB の目印 */
+.eq-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--c-seek); }
+.eq-fill { position: absolute; left: 50%; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--c-accent); }
+.eq-thumb { position: absolute; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: var(--c-accent); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+.eq-note { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--c-divider); font-size: 11px; color: var(--c-muted); line-height: 1.6; }
+@media (orientation: landscape) and (max-height: 480px) { .eq-track { height: 120px; } }
+/* 帯域ソロ */
+.eq-solo-row { gap: 8px; flex-wrap: wrap; }
+.eq-solo-chips { flex-wrap: wrap; justify-content: flex-end; }
+.eq-solo-chips .size-btn:disabled { opacity: 0.35; cursor: default; }
+.eq-solo-hint { margin: 0 0 4px; }
+.eq-solo-btn {
+  margin-top: 2px; width: 100%; max-width: 34px; height: 26px; padding: 0; border-radius: 8px;
+  border: 1px solid var(--c-ctrl-border); background: var(--c-tag); color: var(--c-tag-t);
+  font-size: 11px; font-weight: 800; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.eq-solo-btn.on { background: var(--c-accent); color: var(--c-on-accent); border-color: var(--c-accent); }
+.eq-band.muted .eq-track, .eq-band.muted .eq-db, .eq-band.muted .eq-hz { opacity: 0.4; }
+#eq-btn.solo { outline: 1.5px solid var(--c-accent); outline-offset: 1px; }
+/* 全画面中でも、イコライザーだけはそのまま開ける（他のパネルは全画面では開かない） */
+body.fs #drawer.eq-open, body.fs #drawer.comp-open { display: block !important; top: 0; z-index: 2500; }
+
+/* ═══════════════ タイムスタンプ・A-B（タイムラインのタブ） ═══════════════ */
+#tl-header { gap: 6px; padding: 8px 10px; }
+.tl-tab { min-height: 34px; }
+.mk-bar { display: flex; align-items: center; gap: 10px; padding: 6px 14px 8px; }
+.mk-bar .tag-btn, .mk-foot .tag-btn { padding: 9px 12px; font-size: 12px; justify-content: center; flex-shrink: 0; }
+.mk-bar .tag-btn:disabled, .mk-foot .tag-btn:disabled { opacity: 0.35; cursor: default; }
+.mk-now { flex: 1 1 0; min-width: 0; font-size: 11px; color: var(--c-muted); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.mk-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-height: 44px; padding: 2px 8px 2px 14px; cursor: pointer; }
+.mk-row:hover { background: var(--c-btn-hov); }
+.mk-time {
+  flex-shrink: 0; min-width: 52px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--c-ctrl-border);
+  background: var(--c-tag); color: var(--c-tag-t); font-size: 12px; font-weight: 800; font-family: inherit;
+  font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap;
+}
+.mk-name { flex: 1 1 0; min-width: 0; text-align: left; border: 0; background: none; padding: 8px 4px; color: var(--c-text); font-size: 13px; font-weight: 500; font-family: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.mk-edit { flex: 1 1 0; min-width: 0; }
+.mk-btn { flex-shrink: 0; width: 34px; height: 34px; border: 0; background: none; color: var(--c-muted); font-size: 16px; border-radius: 8px; cursor: pointer; }
+.mk-btn:hover { background: var(--c-btn-hov); }
+/* ループの行: 1 行目に名前、2 行目に区間 */
+.mk-row.loop .mk-time { order: 5; flex: 1 0 100%; min-width: 0; text-align: left; border: 0; background: none; padding: 0 4px 6px; font-size: 11px; color: var(--c-muted); }
+.mk-pane-empty { padding: 20px 14px; text-align: center; color: var(--c-muted); font-size: 12px; line-height: 1.7; }
+.mk-foot { margin: 10px 14px 0; padding-top: 10px; border-top: 1px solid var(--c-divider); }
+.marks-stats { flex: 1 1 0; min-width: 0; white-space: normal; line-height: 1.5; }
+#marks-clear-all { padding: 7px 12px; font-size: 12px; flex-shrink: 0; justify-content: center; }
+#marks-clear-all:disabled { opacity: 0.35; cursor: default; }
+/* 全画面のコントロールに出す「保存」ボタン（設定でオフにできる） */
+#mk-quick, #mk-quick-ab, #ab-btn { display: none; }
+body.fs #mk-quick.enabled, body.fs #mk-quick-ab.enabled, body.fs #ab-btn.enabled { display: inline-flex; }
+/* 時計アイコンだけの保存ボタンは幅を詰める */
+#mk-quick { padding: 4px 8px; min-width: 34px; }
+/* 全画面は横幅に入りきらないことがあるので、ボタン群を折り返し、余白も詰める */
+body.fs .row-tools .grp:first-child { flex-wrap: wrap; row-gap: 4px; }
+body.fs #controls .tag-btn { padding: 4px 8px; min-height: 32px; }
+body.fs #controls .tag-btn#mk-quick { padding: 4px 7px; min-width: 32px; }
+.mk-bar-sub { gap: 8px; }
+#ab-clear-tab { padding: 6px 10px; }
+#ab-clear-tab.idle { opacity: 0.45; }
+.mk-bar-sub { padding-top: 0; padding-bottom: 6px; }
+#mk-quick-ab.setA { outline: 1.5px solid var(--c-accent); outline-offset: -1.5px; }
+/* シークバー上のタイムスタンプ位置 */
+#mk-ticks { position: absolute; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none; }
+.mk-tick { position: absolute; top: -3px; width: 3px; height: 10px; margin-left: -1.5px; border-radius: 1px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.55); }
+
+#ab-btn.idle { opacity: 0.45; }

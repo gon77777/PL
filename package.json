@@ -1,0 +1,20 @@
+{
+  "name": "kyuuri-douga-android",
+  "version": "2.1.0",
+  "private": true,
+  "description": "きゅうり動画 (Android / Capacitor)",
+  "scripts": {
+    "android:add": "cap add android && node scripts/patch-android.js",
+    "android:patch": "node scripts/patch-android.js",
+    "sync": "cap sync android",
+    "build:apk": "node scripts/patch-android.js && cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}
